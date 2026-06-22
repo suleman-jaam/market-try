@@ -1,0 +1,67 @@
+.form {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+.textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 16px;
+  resize: none;
+  min-height: 80px;
+  outline: none;
+  margin-bottom: 12px;
+}
+
+.textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.footerLeft {
+  display: flex;
+  align-items: center;
+}
+
+.footerRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.counter {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.categorySelect {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+}
+
+.categorySelect:focus {
+  border-color: var(--accent-light);
+}
