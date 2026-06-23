@@ -5,12 +5,6 @@ import Post from '@/components/Post'
 import Sidebar from '@/components/Sidebar'
 import styles from './search.module.css'
 
-const RESOURCES = [
-  { icon: 'payments', title: 'Profit Calculator', sub: 'Universal margin tracking' },
-  { icon: 'public', title: 'Global Shipping News', sub: 'Real-time logistics updates' },
-  { icon: 'update', title: 'Platform Updates', sub: 'Algorithm & policy changes' },
-]
-
 const TRENDING_TAGS = ['#Dropshipping', '#ShopifyTips', '#ProductSourcing', '#EtsySuccess', '#Q4Prep']
 
 export default async function SearchPage({ searchParams }) {
@@ -171,32 +165,6 @@ export default async function SearchPage({ searchParams }) {
 
       {/* Right Sidebar */}
       <aside className={styles.rightPanel}>
-        {/* Seller Resources Widget */}
-        <div className={styles.widget}>
-          <div className={styles.widgetHeader}>
-            <h2 className={styles.widgetTitle}>
-              <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 24 }}>hub</span>
-              Seller Resources
-            </h2>
-          </div>
-          <div className={styles.widgetBody}>
-            <p className={styles.widgetText}>
-              Essential tools and breaking news for multi-platform sellers.
-            </p>
-            {RESOURCES.map((r, i) => (
-              <a key={i} href="#" className={styles.resourceLink}>
-                <div className={styles.resourceIcon}>
-                  <span className="material-symbols-outlined sz-18">{r.icon}</span>
-                </div>
-                <div className={styles.resourceInfo}>
-                  <span className={styles.resourceTitle}>{r.title}</span>
-                  <span className={styles.resourceSub}>{r.sub}</span>
-                </div>
-              </a>
-            ))}
-          </div>
-        </div>
-
         {/* Trending Topics Widget */}
         <div className={styles.widget}>
           <div className={styles.widgetHeader}>
