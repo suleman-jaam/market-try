@@ -1,125 +1,159 @@
-.container {
+.layout {
+  display: flex;
   min-height: 100vh;
-  background-color: var(--bg-primary);
+  background-color: var(--bg-page);
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
+/* Center Main Feed */
+.mainFeed {
+  flex: 1;
+  min-width: 0;
+  max-width: 600px;
+  margin-left: var(--nav-width); /* Push past fixed sidebar */
+  border-right: 1px solid var(--border);
+  min-height: 100vh;
+}
+
+/* Header */
 .header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(10, 10, 15, 0.8);
-  backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
   z-index: 50;
+  padding-top: 12px;
 }
 
-.logo {
-  font-size: 18px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+[data-theme='dark'] .header {
+  background: rgba(30, 41, 59, 0.85);
 }
 
-.profileLink {
-  color: var(--accent-light);
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 15px;
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding: 0 16px 12px;
 }
 
-.profileLink:hover {
-  text-decoration: underline;
-}
-
-.main {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 40px 24px;
-}
-
-.title {
-  font-size: 28px;
-  font-weight: 800;
-  margin-bottom: 8px;
-}
-
-.subtitle {
-  color: var(--text-secondary);
-  margin-bottom: 24px;
-}
-
-.placeholder {
-  border: 1px dashed var(--border-light);
-  border-radius: 16px;
-  padding: 40px;
-  text-align: center;
-  color: var(--text-muted);
-  background: var(--bg-card);
-}
-
-/* Feed Tabs */
 .tabs {
   display: flex;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 16px;
 }
 
 .tab {
   flex: 1;
   text-align: center;
-  padding: 12px 0;
-  color: var(--text-secondary);
+  padding: 14px 0;
+  font-size: 15px;
   font-weight: 600;
-  cursor: pointer;
+  color: var(--text-secondary);
   text-decoration: none;
-  transition: color 0.2s;
+  transition: all 0.2s ease;
+  position: relative;
 }
 
 .tab:hover {
-  color: var(--text-primary);
   background: var(--bg-hover);
 }
 
 .activeTab {
   color: var(--text-primary);
-  border-bottom: 2px solid var(--accent);
+  font-weight: 700;
 }
 
-/* Category Filters */
-.filters {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
+.activeTab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 4px;
+  background: var(--primary);
+  border-radius: 4px 4px 0 0;
+}
+
+/* Filter Bar */
+.filterBar {
+  padding: 12px 16px;
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.filterBtn {
-  padding: 6px 14px;
-  border-radius: 20px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+.filterText {
+  font-size: 14px;
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: all 0.2s;
-  white-space: nowrap;
 }
 
-.filterBtn:hover {
-  border-color: var(--accent-light);
+.clearFilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--primary-light);
+  transition: background 0.2s;
+}
+
+.clearFilter:hover {
+  background: rgba(79, 70, 229, 0.15);
+}
+
+/* Posts Container */
+.postList {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Empty State */
+.emptyState {
+  padding: 60px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.emptyState .material-symbols-outlined {
+  font-size: 48px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.emptyState h3 {
+  font-size: 20px;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
-.activeFilter {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-  font-weight: 700;
+.emptyState p {
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 300px;
+}
+
+/* Responsive */
+@media (max-width: 1279px) {
+  .layout {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1023px) {
+  .mainFeed {
+    margin-left: 0;
+    max-width: 100%;
+    border-right: none;
+  }
 }

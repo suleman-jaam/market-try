@@ -1,80 +1,115 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import styles from './PostForm.module.css'
 
-export const CATEGORIES = [
-  'General',
-  'Amazon FBA',
-  'Shopify',
-  'Dropshipping',
-  'Etsy',
-  'TikTok Shop'
-]
-
-export default function PostForm({ userId }) {
+export default function PostForm({ userId, avatarUrl, username }) {
   const router = useRouter()
   const [content, setContent] = useState('')
-  const [category, setCategory] = useState('General')
   const [loading, setLoading] = useState(false)
+  const textareaRef = useRef(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!content.trim()) return
-
     setLoading(true)
     const supabase = createClient()
 
-    const { error } = await supabase.from('posts').insert({
+    // 1. Create the post
+    const { data: postData, error: postError } = await supabase.from('posts').insert({
       user_id: userId,
-      content: content.trim(),
-      category: category === 'General' ? null : category,
-    })
+      content: content.trim()
+    }).select().single()
 
-    if (!error) {
+    if (!postError && postData) {
+      // 2. Extract unique lowercase hashtags
+      const tags = [...new Set(content.match(/#\w+/g) || [])].map(t => t.toLowerCase())
+      
+      if (tags.length > 0) {
+        // 3. Upsert tags (insert if not exists)
+        // using ignoreDuplicates: true is another way, but upsert with onConflict is standard
+        await supabase
+          .from('tags')
+          .upsert(tags.map(name => ({ name })), { onConflict: 'name', ignoreDuplicates: true })
+        
+        // 4. Fetch the tag IDs for the tags we just extracted
+        const { data: tagRecords } = await supabase
+          .from('tags')
+          .select('id, name')
+          .in('name', tags)
+
+        // 5. Link tags to the post in post_tags
+        if (tagRecords && tagRecords.length > 0) {
+          const postTags = tagRecords.map(tag => ({
+            post_id: postData.id,
+            tag_id: tag.id
+          }))
+          await supabase.from('post_tags').insert(postTags)
+        }
+      }
+
       setContent('')
-      setCategory('General')
-      router.refresh() // Refresh the page to show the new post
+      router.refresh()
     } else {
-      console.error('Error creating post:', error)
-      alert(`Failed to create post: ${error.message}`)
+      console.error('Error creating post:', postError)
+      alert(`Failed to create post: ${postError?.message || 'Unknown error'}`)
     }
-    
     setLoading(false)
   }
 
+  const initial = (username || '?').charAt(0).toUpperCase()
+
   return (
-    <form className={styles.form} onSubmit={handleSubmit}>
-      <textarea
-        className={styles.textarea}
-        placeholder="What's working in your store right now?"
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        maxLength={500}
-        disabled={loading}
-      />
-      <div className={styles.footer}>
-        <div className={styles.footerLeft}>
-          <select 
-            className={styles.categorySelect} 
-            value={category} 
-            onChange={(e) => setCategory(e.target.value)}
-            disabled={loading}
-          >
-            {CATEGORIES.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </div>
-        <div className={styles.footerRight}>
-          <span className={styles.counter}>{content.length}/500</span>
-          <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '8px 24px' }} disabled={loading || !content.trim()}>
-            {loading ? 'Posting...' : 'Post'}
-          </button>
+    <div className={styles.formWrap}>
+      {/* User Avatar */}
+      <div className={styles.avatarCol}>
+        <div className={styles.avatar}>
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={username} />
+          ) : (
+            <span>{initial}</span>
+          )}
         </div>
       </div>
-    </form>
+
+      {/* Form */}
+      <form className={styles.form} onSubmit={handleSubmit}>
+        <textarea
+          ref={textareaRef}
+          className={styles.textarea}
+          placeholder="What's happening in your shop?"
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          maxLength={500}
+          disabled={loading}
+          rows={3}
+        />
+
+        <div className={styles.footer}>
+          {/* Media action buttons */}
+          <div className={styles.actions}>
+            <button type="button" className={styles.actionBtn} title="Add image">
+              <span className="material-symbols-outlined sz-20">image</span>
+            </button>
+            <button type="button" className={styles.actionBtn} title="Add poll">
+              <span className="material-symbols-outlined sz-20">bar_chart</span>
+            </button>
+            <button type="button" className={styles.actionBtn} title="Add tag">
+              <span className="material-symbols-outlined sz-20">local_offer</span>
+            </button>
+          </div>
+
+          <button
+            type="submit"
+            className={styles.postBtn}
+            disabled={loading || !content.trim()}
+          >
+            {loading ? 'Posting…' : 'Post'}
+          </button>
+        </div>
+      </form>
+    </div>
   )
 }
