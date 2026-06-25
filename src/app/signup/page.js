@@ -1,184 +1,521 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { useState } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import toast from 'react-hot-toast'
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
+const currentYear = new Date().getFullYear()
+const YEARS = Array.from({ length: 100 }, (_, i) => currentYear - i)
 
 export default function SignupPage() {
-  const router = useRouter();
-  const [form, setForm] = useState({ email: '', password: '', username: '' });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const router = useRouter()
+  const [form, setForm] = useState({
+    firstName: '',
+    surname: '',
+    email: '',
+    password: '',
+    day: '1',
+    month: 'Jan',
+    year: String(currentYear),
+    gender: '',
+  })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    setError('');
-  };
+    setForm({ ...form, [e.target.name]: e.target.value })
+    setError('')
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+    e.preventDefault()
+    setLoading(true)
+    setError('')
 
-    if (form.username.length < 3) {
-      setError('Username must be at least 3 characters.');
-      setLoading(false);
-      return;
+    if (!form.gender) {
+      setError('Please select your gender.')
+      setLoading(false)
+      return
     }
 
-    const supabase = createClient();
-    const { data, error: signUpError } = await supabase.auth.signUp({
+    const monthIndex = MONTHS.indexOf(form.month)
+    const birthDate = new Date(form.year, monthIndex, form.day)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const m = today.getMonth() - birthDate.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+
+    if (age < 15) {
+      setError('You must be at least 15 years old to sign up.')
+      setLoading(false)
+      return
+    }
+
+    const randomSuffix = Math.random().toString(36).substring(2, 6)
+    const generatedUsername = `${form.surname.toLowerCase()}-${randomSuffix}`
+
+    const supabase = createClient()
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
-      options: { data: { username: form.username } },
-    });
+      options: {
+        data: {
+          first_name: form.firstName,
+          last_name: form.surname,
+          full_name: `${form.firstName} ${form.surname}`,
+          display_name: `${form.firstName} ${form.surname}`,
+          username: generatedUsername,
+          gender: form.gender,
+          birthday: `${form.year}-${String(monthIndex + 1).padStart(2, '0')}-${String(form.day).padStart(2, '0')}`,
+        },
+      },
+    })
 
     if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
+      let msg = signUpError.message
+      const lowerMsg = msg.toLowerCase()
+      if (
+        lowerMsg.includes('already registered') ||
+        lowerMsg.includes('already in use') ||
+        lowerMsg.includes('already exists')
+      ) {
+        msg = 'Account already exists. Please login.'
+      }
+      setError(msg)
+      toast.error(msg)
+      setLoading(false)
+      return
     }
 
-    if (data?.user) {
-      await supabase.from('profiles').insert({
-        id: data.user.id,
-        username: form.username,
-        email: form.email,
-      });
+    // When email confirmations are enabled, Supabase returns a fake success response
+    // but the user's identities array will be empty if the email already exists.
+    if (signUpData?.user?.identities && signUpData.user.identities.length === 0) {
+      const msg = 'Account already exists. Please login.'
+      setError(msg)
+      toast.error(msg)
+      setLoading(false)
+      return
     }
 
-    setSuccess(true);
-    setLoading(false);
-  };
-
-  if (success) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="max-w-md w-full space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-on-background">Check your email</h2>
-            <p className="mt-2 text-on-surface-variant">
-              We sent a confirmation link to <strong>{form.email}</strong>. Click it to activate your account.
-            </p>
-            <Link href="/login" className="mt-4 inline-block bg-primary-fixed-dim text-on-primary-fixed-variant px-4 py-2 rounded-lg">
-              Go to login
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+    toast.success('Account created! Please check your email to confirm.')
+    router.push('/login')
   }
 
   return (
-    <main className="flex min-h-screen bg-background">
-      {/* Left side – hidden on small screens */}
-      <section className="hidden lg:flex w-1/2 flex-col justify-center p-12 bg-primary-fixed relative overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg')" }}></div>
-        <div className="relative z-10 flex items-center gap-2 text-primary">
-          <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>storefront</span>
-          <span className="font-display text-xl">GrowthPulse</span>
-        </div>
-        <div className="relative z-10 mt-12 max-w-md">
-          <h1 className="font-display text-4xl text-on-primary-fixed drop-shadow">Connect with the world's best sellers.</h1>
-          <div className="mt-6 inline-flex items-center gap-2 bg-surface/90 backdrop-blur-md px-4 py-2 rounded-full border border-outline-variant/30">
-            <div className="flex -space-x-2">
-              <img className="w-8 h-8 rounded-full border-2 border-surface" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg" alt="" />
-              <img className="w-8 h-8 rounded-full border-2 border-surface" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg" alt="" />
-              <div className="w-8 h-8 rounded-full border-2 border-surface bg-secondary-container flex items-center justify-center text-label-sm text-on-secondary-container">+</div>
-            </div>
-            <span className="text-label-md text-on-surface">Join 50k+ sellers today.</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Right side – form */}
-      <section className="flex w-full lg:w-1/2 items-center justify-center p-8 lg:p-12 bg-surface-lowest">
-        <div className="w-full max-w-md space-y-6">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold text-on-background">Get Started</h2>
-            <p className="text-on-surface-variant">Create an account to join the network.</p>
-          </div>
-
-          {/* Social buttons */}
-          <div className="flex flex-col space-y-3">
-            <button className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-lg border border-outline-variant bg-surface hover:bg-surface-container-low transition">
-              {/* Google SVG */}
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"></path><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path></svg>
-              Continue with Google
-            </button>
-            <button className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-lg border border-outline-variant bg-surface hover:bg-surface-container-low transition">
-              <span className="material-symbols-outlined text-[#95BF47]" style={{ fontVariationSettings: "'FILL' 1" }}>shopping_bag</span>
-              Continue with Shopify
-            </button>
-            <button className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-lg border border-outline-variant bg-surface hover:bg-surface-container-low transition">
-              <span className="material-symbols-outlined text-[#FF9900]" style={{ fontVariationSettings: "'FILL' 1" }}>local_shipping</span>
-              Continue with Amazon
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-px bg-outline-variant/50"></div>
-            <span className="text-body-sm text-on-surface-variant">or</span>
-            <div className="flex-1 h-px bg-outline-variant/50"></div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="username" className="block text-label-md text-on-surface-variant mb-1">Username</label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                placeholder="yourhandle"
-                value={form.username}
-                onChange={handleChange}
-                className="input-field"
-                required
-                autoComplete="username"
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="block text-label-md text-on-surface-variant mb-1">Email</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                value={form.email}
-                onChange={handleChange}
-                className="input-field"
-                required
-                autoComplete="email"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-label-md text-on-surface-variant mb-1">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Min. 6 characters"
-                value={form.password}
-                onChange={handleChange}
-                className="input-field"
-                required
-                autoComplete="new-password"
-              />
-            </div>
-            {error && <p className="error-msg">{error}</p>}
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Creating account...' : 'Create account →'}
-            </button>
-          </form>
-
-          <p className="text-center text-body-sm text-on-surface-variant">
-            Already have an account?{' '}
-            <Link href="/login" className="text-primary hover:text-primary-fixed-dim transition">Log in</Link>
+    <main style={styles.page}>
+      {/* Left — hero image */}
+      <section className="hidden lg:flex" style={styles.left}>
+        <Image
+          src="/signup-image.png"
+          alt="People connecting on Naba Sooq"
+          fill
+          priority
+          style={{ objectFit: 'cover', objectPosition: 'center' }}
+        />
+        {/* Subtle dark overlay for text legibility */}
+        <div style={styles.overlay} />
+        <div style={styles.heroText}>
+          <span style={styles.heroTitle}>Naba Sooq</span>
+          <p style={styles.heroSub}>
+            Connect with friends and the world around you on Naba Sooq.
           </p>
         </div>
       </section>
+
+      {/* Right — form */}
+      <section style={styles.right}>
+        <div style={styles.card}>
+          <h1 style={styles.cardTitle}>Create a new account</h1>
+          <p style={styles.cardSub}>It&apos;s quick and easy.</p>
+
+          <hr style={styles.divider} />
+
+          <form onSubmit={handleSubmit} style={styles.form}>
+            {/* Name row */}
+            <div style={styles.row}>
+              <input
+                id="signup-firstname"
+                name="firstName"
+                type="text"
+                placeholder="First name"
+                value={form.firstName}
+                onChange={handleChange}
+                style={styles.input}
+                required
+                autoComplete="given-name"
+              />
+              <input
+                id="signup-surname"
+                name="surname"
+                type="text"
+                placeholder="Surname"
+                value={form.surname}
+                onChange={handleChange}
+                style={styles.input}
+                required
+                autoComplete="family-name"
+              />
+            </div>
+
+            {/* Email */}
+            <input
+              id="signup-email"
+              name="email"
+              type="email"
+              placeholder="Mobile number or email address"
+              value={form.email}
+              onChange={handleChange}
+              style={styles.inputFull}
+              required
+              autoComplete="email"
+            />
+
+            {/* Password */}
+            <input
+              id="signup-password"
+              name="password"
+              type="password"
+              placeholder="New password"
+              value={form.password}
+              onChange={handleChange}
+              style={styles.inputFull}
+              required
+              autoComplete="new-password"
+              minLength={6}
+            />
+
+            {/* Birthday */}
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>
+                Birthday{' '}
+                <span style={styles.infoIcon} title="Providing your birthday helps make sure you get the right Facebook experience for your age.">
+                  ⓘ
+                </span>
+              </label>
+              <div style={styles.row}>
+                <select
+                  id="signup-day"
+                  name="day"
+                  value={form.day}
+                  onChange={handleChange}
+                  style={styles.select}
+                >
+                  {DAYS.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+                <select
+                  id="signup-month"
+                  name="month"
+                  value={form.month}
+                  onChange={handleChange}
+                  style={styles.select}
+                >
+                  {MONTHS.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <select
+                  id="signup-year"
+                  name="year"
+                  value={form.year}
+                  onChange={handleChange}
+                  style={styles.select}
+                >
+                  {YEARS.map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Gender */}
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>
+                Gender{' '}
+                <span style={styles.infoIcon} title="You can change who can see your gender on your profile.">
+                  ⓘ
+                </span>
+              </label>
+              <div style={styles.genderRow}>
+                {['Female', 'Male', 'Custom'].map(g => (
+                  <label
+                    key={g}
+                    style={{
+                      ...styles.genderOption,
+                      borderColor: form.gender === g ? '#1877f2' : '#ccd0d5',
+                    }}
+                    htmlFor={`gender-${g.toLowerCase()}`}
+                  >
+                    <span style={styles.genderLabel}>{g}</span>
+                    <input
+                      id={`gender-${g.toLowerCase()}`}
+                      type="radio"
+                      name="gender"
+                      value={g}
+                      checked={form.gender === g}
+                      onChange={handleChange}
+                      style={styles.radio}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Privacy notice */}
+            <p style={styles.privacyNote}>
+              People who use our service may have uploaded your contact information to Naba Sooq.{' '}
+              <Link href="#" style={styles.blueLink}>Learn more.</Link>
+            </p>
+
+            <p style={styles.privacyNote}>
+              By clicking Sign Up, you agree to our{' '}
+              <Link href="#" style={styles.blueLink}>Terms</Link>,{' '}
+              <Link href="#" style={styles.blueLink}>Privacy Policy</Link> and{' '}
+              <Link href="#" style={styles.blueLink}>Cookies Policy</Link>.
+              You may receive SMS notifications from us and can opt out at any time.
+            </p>
+
+            {error && <p style={styles.errorMsg}>{error}</p>}
+
+            <div style={styles.submitWrap}>
+              <button
+                id="signup-submit"
+                type="submit"
+                style={{
+                  ...styles.submitBtn,
+                  opacity: loading ? 0.7 : 1,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                }}
+                disabled={loading}
+              >
+                {loading ? 'Creating account...' : 'Sign Up'}
+              </button>
+            </div>
+          </form>
+
+          <div style={styles.loginLinkWrap}>
+            <Link href="/login" style={styles.loginLink}>
+              Already have an account?
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
-  );
+  )
+}
+
+/* ─── Inline styles (mirrors login page approach, Facebook-style) ─── */
+const styles = {
+  page: {
+    display: 'flex',
+    minHeight: '100vh',
+    backgroundColor: '#f0f2f5',
+    fontFamily: "'Inter', sans-serif",
+  },
+  /* ── Left panel ── */
+  left: {
+    position: 'relative',
+    flex: '0 0 58%',
+    overflow: 'hidden',
+  },
+  overlay: {
+    position: 'absolute',
+    inset: 0,
+    background: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.10) 100%)',
+    zIndex: 1,
+  },
+  heroText: {
+    position: 'absolute',
+    top: 40,
+    left: 44,
+    zIndex: 3,
+  },
+  heroTitle: {
+    display: 'block',
+    fontSize: 50,
+    fontWeight: 800,
+    color: '#1877f2',
+    letterSpacing: '-0.5px',
+    textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+    marginBottom: 10,
+  },
+  heroSub: {
+    fontSize: 30,
+    fontWeight: 700,
+    color: '#ffffff',
+    maxWidth: 500,
+    lineHeight: 1.2,
+    textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+  },
+  /* ── Right panel ── */
+  right: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '24px 16px',
+    backgroundColor: '#f0f2f5',
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)',
+    padding: '20px 24px 24px',
+    width: '100%',
+    maxWidth: 432,
+  },
+  cardTitle: {
+    fontSize: 32,
+    fontWeight: 700,
+    color: '#1c1e21',
+    lineHeight: 1.2,
+    marginBottom: 4,
+  },
+  cardSub: {
+    fontSize: 16,
+    color: '#606770',
+    marginBottom: 0,
+  },
+  divider: {
+    border: 'none',
+    borderTop: '1px solid #dadde1',
+    margin: '16px 0',
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  row: {
+    display: 'flex',
+    gap: 8,
+  },
+  input: {
+    flex: '1 1 0',
+    minWidth: 0,
+    width: 0,
+    boxSizing: 'border-box',
+    padding: '14px 16px',
+    border: '1px solid #dddfe2',
+    borderRadius: 6,
+    fontSize: 15,
+    color: '#1c1e21',
+    backgroundColor: '#ffffff',
+    outline: 'none',
+    fontFamily: 'inherit',
+  },
+  inputFull: {
+    width: '100%',
+    padding: '14px 16px',
+    border: '1px solid #dddfe2',
+    borderRadius: 6,
+    fontSize: 15,
+    color: '#1c1e21',
+    backgroundColor: '#ffffff',
+    outline: 'none',
+    fontFamily: 'inherit',
+  },
+  fieldGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#606770',
+  },
+  infoIcon: {
+    color: '#8a8d91',
+    fontSize: 13,
+    cursor: 'help',
+  },
+  select: {
+    flex: 1,
+    padding: '10px 8px',
+    border: '1px solid #dddfe2',
+    borderRadius: 6,
+    fontSize: 15,
+    color: '#1c1e21',
+    backgroundColor: '#ffffff',
+    outline: 'none',
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    appearance: 'auto',
+  },
+  genderRow: {
+    display: 'flex',
+    gap: 8,
+  },
+  genderOption: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '8px 12px',
+    border: '1px solid #ccd0d5',
+    borderRadius: 6,
+    cursor: 'pointer',
+    userSelect: 'none',
+  },
+  genderLabel: {
+    fontSize: 15,
+    color: '#1c1e21',
+  },
+  radio: {
+    width: 18,
+    height: 18,
+    accentColor: '#1877f2',
+    cursor: 'pointer',
+  },
+  privacyNote: {
+    fontSize: 11,
+    color: '#777',
+    lineHeight: 1.5,
+  },
+  blueLink: {
+    color: '#1877f2',
+    textDecoration: 'none',
+  },
+  errorMsg: {
+    color: '#fa3e3e',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  submitWrap: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  submitBtn: {
+    backgroundColor: '#42b72a',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: 6,
+    padding: '14px 80px',
+    fontSize: 17,
+    fontWeight: 700,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    transition: 'background-color 0.15s ease',
+  },
+  loginLinkWrap: {
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  loginLink: {
+    color: '#1877f2',
+    fontSize: 14,
+    fontWeight: 600,
+    textDecoration: 'none',
+  },
 }

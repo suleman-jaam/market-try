@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import toast from 'react-hot-toast'
 import styles from './PostForm.module.css'
 
 export default function PostForm({ userId, avatarUrl, username }) {
@@ -51,10 +52,11 @@ export default function PostForm({ userId, avatarUrl, username }) {
       }
 
       setContent('')
+      toast.success('Post created successfully')
       router.refresh()
     } else {
       console.error('Error creating post:', postError)
-      alert(`Failed to create post: ${postError?.message || 'Unknown error'}`)
+      toast.error(`Failed to create post: ${postError?.message || 'Unknown error'}`)
     }
     setLoading(false)
   }
@@ -90,13 +92,13 @@ export default function PostForm({ userId, avatarUrl, username }) {
         <div className={styles.footer}>
           {/* Media action buttons */}
           <div className={styles.actions}>
-            <button type="button" className={styles.actionBtn} title="Add image">
+            <button type="button" className={styles.actionBtn} title="Add image" onClick={() => toast('Image upload coming soon', { icon: '🚧' })}>
               <span className="material-symbols-outlined sz-20">image</span>
             </button>
-            <button type="button" className={styles.actionBtn} title="Add poll">
+            <button type="button" className={styles.actionBtn} title="Add poll" onClick={() => toast('Polls coming soon', { icon: '🚧' })}>
               <span className="material-symbols-outlined sz-20">bar_chart</span>
             </button>
-            <button type="button" className={styles.actionBtn} title="Add tag">
+            <button type="button" className={styles.actionBtn} title="Add tag" onClick={() => toast('Product tags coming soon', { icon: '🚧' })}>
               <span className="material-symbols-outlined sz-20">local_offer</span>
             </button>
           </div>

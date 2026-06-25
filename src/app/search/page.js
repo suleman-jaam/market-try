@@ -5,7 +5,7 @@ import Post from '@/components/Post'
 import Sidebar from '@/components/Sidebar'
 import styles from './search.module.css'
 
-const TRENDING_TAGS = ['#Dropshipping', '#ShopifyTips', '#ProductSourcing', '#EtsySuccess', '#Q4Prep']
+
 
 export default async function SearchPage({ searchParams }) {
   const params = await searchParams
@@ -53,13 +53,43 @@ export default async function SearchPage({ searchParams }) {
     posts = postsData || []
   } else {
     // Show recent posts as "Explore" when there's no query
-    const { data: explorePosts } = await supabase
+    let queryBuilder = supabase
       .from('posts')
-      .select('*, profiles(username, avatar_url), likes(user_id), comments(*, profiles(username, avatar_url))')
-      .order('created_at', { ascending: false })
-      .limit(20)
+      .select('*, profiles(username, avatar_url, display_name, seller_score), likes(user_id), comments(*, profiles(username, avatar_url))')
 
+    if (filter === 'verified') {
+      // For verified filter, we could join profiles or we can filter in JS, but let's assume verified means seller_score > 0 for now.
+      // Wait, we don't have a verified column on posts. Let's just do an order change or simple filter.
+      // Actually, filtering by date is just ascending/descending.
+      // Let's keep it simple and handle the 'date' filter by sorting differently.
+    }
+
+    if (filter === 'date') {
+      queryBuilder = queryBuilder.order('created_at', { ascending: true }) // oldest first? or just rely on default descending
+    } else {
+      queryBuilder = queryBuilder.order('created_at', { ascending: false })
+    }
+
+    const { data: explorePosts } = await queryBuilder.limit(20)
     posts = explorePosts || []
+
+    if (filter === 'verified') {
+      posts = posts.filter(p => p.profiles?.seller_score >= 100)
+    }
+  }
+
+  // Fetch dynamic trending tags
+  const { data: tagsData } = await supabase.from('tags').select('name, post_tags(id)')
+  let trendingTags = (tagsData || [])
+    .map(t => ({ tag: t.name, count: t.post_tags.length }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+  if (trendingTags.length === 0) {
+    trendingTags = [
+      { tag: 'amazonfba', count: 0 },
+      { tag: 'shopify', count: 0 },
+      { tag: 'ecommerce', count: 0 }
+    ]
   }
 
   return (
@@ -127,7 +157,7 @@ export default async function SearchPage({ searchParams }) {
             <h3 className={styles.sectionTitle}>Users</h3>
             <div className={styles.userGrid}>
               {users.map(u => (
-                <Link key={u.id} href={`/${u.username}`} className={styles.userCard}>
+                <Link key={u.id} href={`/@${u.username}`} className={styles.userCard}>
                   <div className={styles.avatar}>
                     {u.avatar_url ? (
                       <img src={u.avatar_url} alt={u.username} className={styles.avatarImg} />
@@ -172,13 +202,13 @@ export default async function SearchPage({ searchParams }) {
           </div>
           <div className={styles.widgetBody}>
             <div className={styles.tagsWrap}>
-              {TRENDING_TAGS.map((tag, i) => (
+              {trendingTags.map((t, i) => (
                 <Link
                   key={i}
-                  href={`/feed?tag=${encodeURIComponent(tag.substring(1).toLowerCase())}`}
+                  href={`/feed?tag=${encodeURIComponent(t.tag)}`}
                   className={styles.tagPill}
                 >
-                  {tag}
+                  {t.tag} <span style={{opacity: 0.6, fontSize: '0.8em', marginLeft: 4}}>{t.count} posts</span>
                 </Link>
               ))}
             </div>
@@ -191,7 +221,7 @@ export default async function SearchPage({ searchParams }) {
           <a href="#">Terms of Service</a>
           <a href="#">Seller Guidelines</a>
           <a href="#">Help Center</a>
-          <span>© 2026 GrowthPulse</span>
+          <span>© 2026 Naba Sooq</span>
         </div>
       </aside>
     </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import toast from 'react-hot-toast'
 
 export default function FollowButton({ targetUserId, currentUserId, initialIsFollowing }) {
   const router = useRouter()
@@ -21,15 +22,19 @@ export default function FollowButton({ targetUserId, currentUserId, initialIsFol
 
     if (isFollowing) {
       // Unfollow
-      await supabase
+      const { error } = await supabase
         .from('follows')
         .delete()
         .match({ follower_id: currentUserId, following_id: targetUserId })
+      if (!error) toast.success('Unfollowed successfully')
+      else toast.error('Failed to unfollow')
     } else {
       // Follow
-      await supabase
+      const { error } = await supabase
         .from('follows')
         .insert({ follower_id: currentUserId, following_id: targetUserId })
+      if (!error) toast.success('Followed successfully')
+      else toast.error('Failed to follow')
     }
 
     setLoading(false)

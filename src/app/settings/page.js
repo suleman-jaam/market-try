@@ -2,6 +2,7 @@
 
 import { useTheme } from 'next-themes'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 import { useState, useEffect } from 'react'
 import styles from './settings.module.css'
 
@@ -13,6 +14,18 @@ export default function SettingsPage() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme)
+    toast.success(`Theme set to ${newTheme}`, {
+      style: {
+        borderRadius: '10px',
+        background: 'var(--bg-surface)',
+        color: 'var(--text-primary)',
+        border: '1px solid var(--border)',
+      },
+    })
+  }
 
   if (!mounted) {
     return null
@@ -33,28 +46,28 @@ export default function SettingsPage() {
           <div className={styles.settingRow}>
             <div className={styles.settingInfo}>
               <div className={styles.settingName}>Theme</div>
-              <div className={styles.settingDesc}>Choose how SellerSpace looks to you.</div>
+              <div className={styles.settingDesc}>Choose how Naba Sooq looks to you.</div>
             </div>
 
             <div className={styles.themeSelector}>
               <button
                 className={styles.themeBtn}
                 data-active={theme === 'light'}
-                onClick={() => setTheme('light')}
+                onClick={() => handleThemeChange('light')}
               >
                 Light
               </button>
               <button
                 className={styles.themeBtn}
                 data-active={theme === 'dark'}
-                onClick={() => setTheme('dark')}
+                onClick={() => handleThemeChange('dark')}
               >
                 Dark
               </button>
               <button
                 className={styles.themeBtn}
                 data-active={theme === 'system'}
-                onClick={() => setTheme('system')}
+                onClick={() => handleThemeChange('system')}
               >
                 System
               </button>
@@ -90,7 +103,7 @@ export default function SettingsPage() {
               <div className={styles.settingName}>Email Digest</div>
               <div className={styles.settingDesc}>Receive a weekly summary of top posts.</div>
             </div>
-            <input type="checkbox" disabled />
+            <input type="checkbox" onChange={() => toast('Notifications are coming soon!', { icon: '🚧' })} />
           </div>
         </section>
 

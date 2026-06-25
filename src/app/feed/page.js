@@ -22,12 +22,20 @@ export default async function FeedPage({ searchParams }) {
     .from('profiles').select('*').eq('id', user.id).single()
 
   if (!profile) {
-    const { data: newProfile } = await supabase.from('profiles').insert({
+    const { data: newProfile, error } = await supabase.from('profiles').insert({
       id: user.id,
       username: user.user_metadata?.username || `user_${user.id.substring(0, 6)}`,
       email: user.email,
     }).select().single()
-    profile = newProfile
+    
+    if (error) {
+      console.error('Error creating profile:', error)
+    }
+    
+    profile = newProfile || { 
+      username: user.user_metadata?.username || `user_${user.id.substring(0, 6)}`,
+      avatar_url: null
+    }
   }
 
   // Tag Filtering Logic

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import toast from 'react-hot-toast'
 import styles from './Post.module.css'
 
 function timeAgo(dateString) {
@@ -32,13 +33,40 @@ export default function Post({ post, currentUserId }) {
   const displayName = post.profiles?.display_name || username
   const initial = (displayName).charAt(0).toUpperCase()
 
-  const handleDelete = async () => {
-    if (!window.confirm('Delete this post?')) return
-    setIsDeleting(true)
-    const supabase = createClient()
-    const { error } = await supabase.from('posts').delete().eq('id', post.id)
-    if (!error) router.refresh()
-    else setIsDeleting(false)
+  const handleDelete = () => {
+    toast((t) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <p style={{ margin: 0, fontWeight: 500, color: 'var(--on-surface)' }}>Are you sure you want to delete this post?</p>
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          <button 
+            className="btn-secondary"
+            style={{ width: 'auto', padding: '6px 16px', minHeight: '32px' }}
+            onClick={() => toast.dismiss(t.id)}
+          >
+            Cancel
+          </button>
+          <button 
+            className="btn-primary"
+            style={{ width: 'auto', padding: '6px 16px', minHeight: '32px', background: '#DC2626' }}
+            onClick={async () => {
+              toast.dismiss(t.id)
+              setIsDeleting(true)
+              const supabase = createClient()
+              const { error } = await supabase.from('posts').delete().eq('id', post.id)
+              if (!error) {
+                toast.success('Post deleted')
+                router.refresh()
+              } else {
+                toast.error('Failed to delete post')
+                setIsDeleting(false)
+              }
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    ), { duration: Infinity })
   }
 
   const handleLike = async () => {
@@ -64,7 +92,13 @@ export default function Post({ post, currentUserId }) {
       post_id: post.id,
       content: commentContent.trim()
     })
-    if (!error) { setCommentContent(''); router.refresh() }
+    if (!error) { 
+      setCommentContent('')
+      toast.success('Comment posted')
+      router.refresh() 
+    } else {
+      toast.error('Failed to post comment')
+    }
     setIsSubmittingComment(false)
   }
 
@@ -91,7 +125,7 @@ export default function Post({ post, currentUserId }) {
     <article className={styles.post}>
       {/* Avatar */}
       <div className={styles.avatarWrap}>
-        <Link href={`/${username}`} className={styles.avatarLink}>
+        <Link href={`/@${username}`} className={styles.avatarLink}>
           {post.profiles?.avatar_url ? (
             <img src={post.profiles.avatar_url} alt={username} className={styles.avatarImg} />
           ) : (
@@ -105,7 +139,7 @@ export default function Post({ post, currentUserId }) {
         {/* Post Header */}
         <div className={styles.postHeader}>
           <div className={styles.authorInfo}>
-            <Link href={`/${username}`} className={styles.displayName}>
+            <Link href={`/@${username}`} className={styles.displayName}>
               {displayName}
             </Link>
             <span className={styles.handle}>@{username}</span>
@@ -150,7 +184,7 @@ export default function Post({ post, currentUserId }) {
           </button>
 
           {/* Repost */}
-          <button className={styles.engageBtn}>
+          <button className={styles.engageBtn} onClick={() => toast('Reposting coming soon', { icon: '🚧' })}>
             <span className={`${styles.engageIcon} ${styles.repostIcon}`}>
               <span className="material-symbols-outlined sz-18">repeat</span>
             </span>
@@ -168,14 +202,14 @@ export default function Post({ post, currentUserId }) {
           </button>
 
           {/* Views */}
-          <button className={styles.engageBtn}>
+          <button className={styles.engageBtn} onClick={() => toast('Analytics coming soon', { icon: '📊' })}>
             <span className={`${styles.engageIcon} ${styles.viewIcon}`}>
               <span className="material-symbols-outlined sz-18">bar_chart</span>
             </span>
           </button>
 
           {/* Share */}
-          <button className={styles.engageBtn}>
+          <button className={styles.engageBtn} onClick={() => toast.success('Link copied to clipboard!')}>
             <span className={`${styles.engageIcon} ${styles.shareIcon}`}>
               <span className="material-symbols-outlined sz-18">share</span>
             </span>

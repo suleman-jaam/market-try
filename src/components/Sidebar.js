@@ -4,23 +4,25 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import styles from './Sidebar.module.css'
 
-const NAV_ITEMS = [
+const NAV_ITEMS_BASE = [
   { href: '/feed', label: 'Home', icon: 'home' },
   { href: '/search', label: 'Explore', icon: 'explore' },
   { href: '/notifications', label: 'Notifications', icon: 'notifications' },
   { href: '/messages', label: 'Messages', icon: 'mail' },
-  { href: '/profile', label: 'Profile', icon: 'person' },
 ]
 
 export default function Sidebar({ profile, onPost }) {
   const pathname = usePathname()
 
+  const NAV_ITEMS = profile?.username
+    ? [...NAV_ITEMS_BASE, { href: `/@${profile.username}`, label: 'Profile', icon: 'person' }]
+    : NAV_ITEMS_BASE;
+
   return (
     <nav className={styles.sidebar}>
       {/* Brand */}
       <div className={styles.brand}>
-        <span className={styles.brandName}>GrowthPulse</span>
-        <span className={styles.brandSub}>Seller Hub</span>
+        <span className={styles.brandName}>Naba Sooq</span>
       </div>
 
       {/* Nav Links */}
@@ -55,7 +57,7 @@ export default function Sidebar({ profile, onPost }) {
         </Link>
 
         {profile && (
-          <Link href={`/${profile.username}`} className={styles.userChip}>
+          <Link href={`/@${profile.username}`} className={styles.userChip}>
             <div className={styles.userAvatar}>
               {profile.avatar_url ? (
                 <img src={profile.avatar_url} alt={profile.username} />

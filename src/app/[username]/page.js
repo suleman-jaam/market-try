@@ -1,14 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import EditProfileModal from '@/components/EditProfileModal'
 import Post from '@/components/Post'
 import Sidebar from '@/components/Sidebar'
 import RightPanel from '@/components/RightPanel'
+import ShareProfileButton from '@/components/ShareProfileButton'
+import ProfileTabs from '@/components/ProfileTabs'
 import feedStyles from '../feed/feed.module.css'
 import styles from './profile.module.css'
 
 export default async function ProfilePage({ params }) {
-  const { username } = await params
+  const paramsData = await params
+  const rawUsername = decodeURIComponent(paramsData.username)
+  const username = rawUsername.startsWith('@') ? rawUsername.slice(1) : rawUsername
   const supabase = await createClient()
 
   // Get current logged in user and their profile for the Sidebar
@@ -64,7 +69,9 @@ export default async function ProfilePage({ params }) {
     .order('created_at', { ascending: false })
 
   const displayJoinedDate = new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  const displayName = profile.display_name || profile.username
+  const displayName = (profile.first_name && profile.last_name) 
+    ? `${profile.first_name} ${profile.last_name}` 
+    : profile.username
   const initial = displayName.charAt(0).toUpperCase()
 
   return (
@@ -113,13 +120,13 @@ export default async function ProfilePage({ params }) {
             </div>
             
             <div className={styles.actionButtons}>
-              <button className={styles.iconBtn}>
-                <span className="material-symbols-outlined sz-20">more_horiz</span>
-              </button>
+              <ShareProfileButton username={profile.username} className={styles.shareBtn} />
               {isOwnProfile ? (
-                <button className={styles.editBtn}>Edit Profile</button>
+                <div className={styles.primaryBtnWrap}>
+                  <EditProfileModal profile={profile} />
+                </div>
               ) : (
-                <button className={styles.editBtn}>{isFollowing ? 'Following' : 'Follow'}</button>
+                <button className={styles.primaryBtn}>{isFollowing ? 'Following' : 'Follow'}</button>
               )}
             </div>
           </div>
@@ -129,11 +136,19 @@ export default async function ProfilePage({ params }) {
             <h1 className={styles.displayName}>{displayName}</h1>
             <h2 className={styles.username}>@{profile.username}</h2>
             
-            <p className={styles.bio}>
-              {profile.bio || "E-commerce seller sharing the journey. 📈 Building in public."}
-            </p>
+            {profile.bio && (
+              <p className={styles.bio}>
+                {profile.bio}
+              </p>
+            )}
 
             <div className={styles.metaRow}>
+              {profile.location && (
+                <div className={styles.metaItem}>
+                  <span className="material-symbols-outlined sz-16">location_on</span>
+                  {profile.location}
+                </div>
+              )}
               {profile.website_url && (
                 <div className={styles.metaItem}>
                   <span className="material-symbols-outlined sz-16">link</span>
@@ -149,43 +164,20 @@ export default async function ProfilePage({ params }) {
             </div>
 
             <div className={styles.statsRow}>
-              <div className={styles.statsGroup}>
-                <div className={styles.stat}>
-                  <span className={styles.statNum}>{followingCount?.toLocaleString() || 0}</span>
-                  <span className={styles.statLabel}>Following</span>
-                </div>
-                <div className={styles.stat}>
-                  <span className={styles.statNum}>{followerCount?.toLocaleString() || 0}</span>
-                  <span className={styles.statLabel}>Followers</span>
-                </div>
+              <div className={styles.stat}>
+                <span className={styles.statNum}>{followingCount?.toLocaleString() || 0}</span>
+                <span className={styles.statLabel}>Following</span>
               </div>
-              
-              <div className={styles.sellerScore}>
-                <span className="material-symbols-outlined sz-16">verified</span>
-                Seller Score: {profile.seller_score || 0}
+              <div className={styles.stat}>
+                <span className={styles.statNum}>{followerCount?.toLocaleString() || 0}</span>
+                <span className={styles.statLabel}>Followers</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className={styles.tabs}>
-          <div className={`${styles.tab} ${styles.activeTab}`}>Posts</div>
-          <div className={styles.tab}>Media</div>
-          <div className={styles.tab}>Likes</div>
-          <div className={styles.tab}>Marketplace</div>
-        </div>
-
-        {/* Posts Feed */}
-        <div className={styles.postList}>
-          {posts && posts.length > 0 ? (
-            posts.map(post => <Post key={post.id} post={post} currentUserId={currentUser?.id} />)
-          ) : (
-            <div className={styles.emptyState}>
-              <p>@{profile.username} hasn't posted anything yet.</p>
-            </div>
-          )}
-        </div>
+        {/* Tabs & Content */}
+        <ProfileTabs profile={profile} posts={posts} currentUser={currentUser} />
 
       </main>
 

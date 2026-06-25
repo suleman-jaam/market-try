@@ -1,17 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lexend:wght@600;700;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* ========== DESIGN TOKENS ========== */
 :root {
   /* Core Brand */
-  --primary: #4F46E5;
-  --primary-hover: #4338CA;
-  --primary-light: rgba(79, 70, 229, 0.08);
-  --primary-glow: rgba(79, 70, 229, 0.15);
+  --primary: #2563EB;
+  --primary-hover: #1D4ED8;
+  --primary-light: rgba(37, 99, 235, 0.08);
+  --primary-glow: rgba(37, 99, 235, 0.15);
 
   /* Surface */
   --bg-page: #F8FAFC;
@@ -28,7 +26,7 @@
 
   /* Border */
   --border: #E2E8F0;
-  --border-focus: #4F46E5;
+  --border-focus: #2563EB;
 
   /* Semantic */
   --success: #10B981;
@@ -50,10 +48,10 @@
 
 /* Dark mode */
 [data-theme='dark'] {
-  --primary: #818CF8;
-  --primary-hover: #6366F1;
-  --primary-light: rgba(129, 140, 248, 0.1);
-  --primary-glow: rgba(129, 140, 248, 0.2);
+  --primary: #3B82F6;
+  --primary-hover: #2563EB;
+  --primary-light: rgba(59, 130, 246, 0.1);
+  --primary-glow: rgba(59, 130, 246, 0.2);
 
   --bg-page: #0F172A;
   --bg-surface: #1E293B;
@@ -67,7 +65,7 @@
   --text-inverse: #0F172A;
 
   --border: rgba(255, 255, 255, 0.08);
-  --border-focus: #818CF8;
+  --border-focus: #3B82F6;
 
   --sidebar-bg: #1E293B;
 }
