@@ -1,0 +1,109 @@
+NABA SOOQ — BLOG PAGE IDEAS
+============================================================
+A blog section would position Naba Sooq as the go-to knowledge
+hub for e-commerce sellers — not just a social platform.
+============================================================
+
+
+CONTENT CATEGORIES
+------------------
+
+1. PLATFORM GUIDES
+   - How to start an Amazon FBA business from scratch
+   - Shopify vs WooCommerce vs TikTok Shop — which is right for you?
+   - Step-by-step guide to listing on Etsy, Daraz, eBay
+   - How to set up Facebook & Instagram Shops
+   - Selling on Alibaba for beginners
+
+2. PRODUCT RESEARCH
+   - How to find winning products using Jungle Scout / Helium 10
+   - Reading market trends with Google Trends & TikTok
+   - Niche selection strategies for 2025
+   - Seasonal product opportunities (Eid, back-to-school, etc.)
+   - Avoiding saturated markets — red flags to look for
+
+3. LOGISTICS & SHIPPING
+   - How to ship internationally from Pakistan / South Asia
+   - FBA vs FBM — pros, cons, and hybrid strategies
+   - How to deal with customs, duties, and returns
+   - Comparing freight forwarders
+   - Packaging & labelling requirements per platform
+
+4. BRANDING & MARKETING
+   - Building a private label brand from scratch
+   - Writing product listings that convert (SEO for Amazon)
+   - How to run profitable PPC campaigns on Amazon/Shopify
+   - Influencer marketing on a tight budget
+   - Email marketing for e-commerce stores
+
+5. FINANCE & ACCOUNTING
+   - Calculating your actual profit margins (template included)
+   - Understanding Amazon fees, referral fees, and storage costs
+   - How to handle VAT/tax for international sellers
+   - Currency exchange strategies for cross-border sellers
+   - When and how to reinvest profits
+
+6. SELLER STORIES (HIGH ENGAGEMENT)
+   - "From $0 to $10k/month: A seller's journey"
+   - Failure stories — what went wrong and lessons learned
+   - Case studies of viral products
+   - Interview with top Naba Sooq sellers (community-driven)
+
+7. TOOLS & TECH
+   - Best free tools for e-commerce sellers in 2025
+   - AI tools for product descriptions, images, and ads
+   - How to automate your store operations
+   - Inventory management software compared
+   - Top browser extensions every seller should have
+
+8. TRENDS & NEWS
+   - Weekly e-commerce news roundup
+   - Emerging markets for online sellers (Pakistan, Middle East, SEA)
+   - Platform policy updates (Amazon, TikTok, etc.)
+   - New payment methods and buy-now-pay-later for sellers
+
+9. BEGINNER SERIES
+   - "E-commerce 101" — a step-by-step starter guide series
+   - Glossary of e-commerce terms
+   - How to register a business for online selling
+   - Setting up your first store checklist
+
+10. COMMUNITY SPOTLIGHTS
+    - Trending posts from Naba Sooq this week
+    - Most discussed topics in the community
+    - Top sellers to follow this month
+    - Community Q&A highlights
+
+
+BLOG PAGE FEATURES TO BUILD
+----------------------------
+- Category filter bar (by topic)
+- Featured / trending article at top (hero section)
+- Reading time estimate on each post
+- Author bio with link to their Naba Sooq profile
+- Related posts at bottom of each article
+- Social share buttons (copy link, share on WhatsApp)
+- Bookmark / save articles to profile
+- Comment section (use existing comments system)
+- Search within blog
+- Newsletter subscription widget
+- SEO-friendly URLs: /blog/how-to-start-amazon-fba
+
+
+MONETIZATION IDEAS FOR THE BLOG
+---------------------------------
+- Sponsored posts from tools (Helium 10, Jungle Scout, etc.)
+- Affiliate links to recommended software/services
+- Premium gated content for verified sellers
+- Promoted brand/product mentions within articles
+
+
+TECH SUGGESTIONS
+-----------------
+- Blog posts stored in a `blog_posts` Supabase table
+  (id, title, slug, content, category, author_id, published_at, cover_image)
+- Rich text / markdown editor for writing posts
+- Only verified sellers (seller_score >= 100) can publish
+- All users can read and comment
+
+============================================================

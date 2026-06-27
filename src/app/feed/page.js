@@ -7,6 +7,9 @@ import Sidebar from '@/components/Sidebar'
 import RightPanel from '@/components/RightPanel'
 import styles from './feed.module.css'
 
+// Always fetch fresh data — never serve a cached page
+export const dynamic = 'force-dynamic'
+
 export default async function FeedPage({ searchParams }) {
   const params = await searchParams
   const activeTab = params.tab === 'following' ? 'following' : 'for-you'
@@ -22,17 +25,19 @@ export default async function FeedPage({ searchParams }) {
     .from('profiles').select('*').eq('id', user.id).single()
 
   if (!profile) {
-    const { data: newProfile, error } = await supabase.from('profiles').insert({
-      id: user.id,
-      username: user.user_metadata?.username || `user_${user.id.substring(0, 6)}`,
-      email: user.email,
-    }).select().single()
-    
-    if (error) {
-      console.error('Error creating profile:', error)
-    }
-    
-    profile = newProfile || { 
+    const { data: newProfile, error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: user.id,
+        username: user.user_metadata?.username || `user_${user.id.substring(0, 6)}`,
+        email: user.email,
+      })
+      .select()
+      .single()
+
+    if (profileError) console.error('[Feed] Error creating profile:', profileError)
+
+    profile = newProfile || {
       username: user.user_metadata?.username || `user_${user.id.substring(0, 6)}`,
       avatar_url: null
     }
@@ -46,41 +51,110 @@ export default async function FeedPage({ searchParams }) {
       const { data: postTags } = await supabase.from('post_tags').select('post_id').eq('tag_id', tagData.id)
       postIdsWithTag = postTags ? postTags.map(pt => pt.post_id) : []
     } else {
-      postIdsWithTag = [] // Tag doesn't exist, so no posts
+      postIdsWithTag = []
     }
   }
 
-  // Build base query helper
-  const buildQuery = (query) => {
-    if (postIdsWithTag !== null) {
-      // If there are no posts with this tag, we ensure an empty result
-      if (postIdsWithTag.length === 0) return query.eq('id', '00000000-0000-0000-0000-000000000000')
-      query = query.in('id', postIdsWithTag)
-    }
-    return query.order('created_at', { ascending: false })
-  }
-
+  // ── Fetch posts ──────────────────────────────────────────────────────────
   let posts = []
+  let skipQuery = false
 
-  if (activeTab === 'for-you') {
-    const { data } = await buildQuery(
-      supabase.from('posts')
-        .select('*, profiles(username, avatar_url), likes(user_id), comments(*, profiles(username, avatar_url))')
-    )
-    posts = data || []
-  } else {
-    const { data: follows } = await supabase
-      .from('follows').select('following_id').eq('follower_id', user.id)
+  try {
+    let baseQuery = supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles!posts_user_id_fkey ( id, username, avatar_url, display_name, first_name, last_name ),
+        likes    ( user_id ),
+        comments ( *, profiles ( username, avatar_url ) )
+      `)
 
-    const followingIds = follows ? follows.map(f => f.following_id) : []
-    const userIdsToFetch = [...followingIds, user.id]
+    // Tab filter
+    if (activeTab === 'following') {
+      const { data: follows } = await supabase
+        .from('follows').select('following_id').eq('follower_id', user.id)
+      const followingIds = (follows || []).map(f => f.following_id)
+      if (followingIds.length === 0) {
+        skipQuery = true
+      } else {
+        baseQuery = baseQuery.in('user_id', followingIds)
+      }
+    }
 
-    const { data } = await buildQuery(
-      supabase.from('posts')
-        .select('*, profiles(username, avatar_url), likes(user_id), comments(*, profiles(username, avatar_url))')
-        .in('user_id', userIdsToFetch)
-    )
-    posts = data || []
+    // Tag filter
+    if (postIdsWithTag !== null) {
+      if (postIdsWithTag.length === 0) {
+        // No posts with this tag — short-circuit
+        skipQuery = true
+      } else {
+        baseQuery = baseQuery.in('id', postIdsWithTag)
+      }
+    }
+
+    if (!skipQuery) {
+      const { data, error } = await baseQuery.order('created_at', { ascending: false })
+
+      if (error) {
+        // Log server-side — never expose to the user
+        console.error('[Feed] Query error:', error)
+
+        // Fallback: fetch posts without the join, then manually resolve profiles
+        const { data: rawPosts, error: rawError } = await supabase
+          .from('posts')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (rawError) {
+          console.error('[Feed] Fallback query error:', rawError)
+        } else if (rawPosts?.length) {
+          // Fetch all unique profile IDs in one request
+          const profileIds = [...new Set(rawPosts.map(p => p.user_id))]
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('*')   // select all — avoids column-not-found on older schema
+            .in('id', profileIds)
+
+          if (profilesError) {
+            console.error('[Feed] Profiles fallback error:', profilesError)
+          }
+          const profileMap = Object.fromEntries((profilesData || []).map(p => [p.id, p]))
+
+          // Fetch comments
+          const postIds = rawPosts.map(p => p.id)
+          const { data: rawComments } = await supabase
+            .from('comments')
+            .select('*')
+            .in('post_id', postIds)
+          
+          // Map comments to posts and add profile data to comments if possible
+          const commentsByPost = {}
+          if (rawComments) {
+            const commentProfileIds = [...new Set(rawComments.map(c => c.user_id))]
+            const { data: commentProfiles } = await supabase.from('profiles').select('*').in('id', commentProfileIds)
+            const commentProfileMap = Object.fromEntries((commentProfiles || []).map(p => [p.id, p]))
+            
+            rawComments.forEach(comment => {
+              if (!commentsByPost[comment.post_id]) commentsByPost[comment.post_id] = []
+              commentsByPost[comment.post_id].push({
+                ...comment,
+                profiles: commentProfileMap[comment.user_id] || null
+              })
+            })
+          }
+
+          posts = rawPosts.map(post => ({
+            ...post,
+            profiles: profileMap[post.user_id] || null,
+            likes: [],
+            comments: commentsByPost[post.id] || [],
+          }))
+        }
+      } else {
+        posts = data || []
+      }
+    }
+  } catch (err) {
+    console.error('[Feed] Unexpected error:', err)
   }
 
   // Build URL helpers preserving tab/tag state
@@ -112,8 +186,8 @@ export default async function FeedPage({ searchParams }) {
         </header>
 
         {/* Composer */}
-        <PostForm 
-          userId={user.id} 
+        <PostForm
+          userId={user.id}
           username={profile.username}
           avatarUrl={profile.avatar_url}
         />
@@ -122,7 +196,7 @@ export default async function FeedPage({ searchParams }) {
         {activeTag && (
           <div className={styles.filterBar}>
             <span className={styles.filterText}>
-              Showing posts for <strong>#{activeTag}</strong>
+              Showing posts for <strong>#{activeTag.replace(/^#/, '')}</strong>
             </span>
             <Link href={`/feed?tab=${activeTab}`} className={styles.clearFilter}>
               Clear <span className="material-symbols-outlined sz-16">close</span>

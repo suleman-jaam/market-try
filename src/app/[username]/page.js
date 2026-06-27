@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import EditProfileModal from '@/components/EditProfileModal'
+import FollowButton from '@/components/FollowButton'
 import Post from '@/components/Post'
 import Sidebar from '@/components/Sidebar'
 import RightPanel from '@/components/RightPanel'
@@ -9,6 +10,8 @@ import ShareProfileButton from '@/components/ShareProfileButton'
 import ProfileTabs from '@/components/ProfileTabs'
 import feedStyles from '../feed/feed.module.css'
 import styles from './profile.module.css'
+
+export const dynamic = 'force-dynamic'
 
 export default async function ProfilePage({ params }) {
   const paramsData = await params
@@ -37,36 +40,89 @@ export default async function ProfilePage({ params }) {
 
   const isOwnProfile = currentUser?.id === profile.id
 
-  // Fetch follower count
-  const { count: followerCount } = await supabase
+  // Fetch follower count & IDs
+  const { data: followersData, count: followerCount } = await supabase
     .from('follows')
-    .select('*', { count: 'exact', head: true })
+    .select('follower_id', { count: 'exact' })
     .eq('following_id', profile.id)
 
-  // Fetch following count
-  const { count: followingCount } = await supabase
+  // Fetch following count & IDs
+  const { data: followingData, count: followingCount } = await supabase
     .from('follows')
-    .select('*', { count: 'exact', head: true })
+    .select('following_id', { count: 'exact' })
     .eq('follower_id', profile.id)
+
+  // Calculate mutual friends
+  let friends = []
+  const followerIds = (followersData || []).map(f => f.follower_id)
+  const followingIds = (followingData || []).map(f => f.following_id)
+  const mutualIds = followerIds.filter(id => followingIds.includes(id))
+
+  if (mutualIds.length > 0) {
+    const { data: mutualProfiles } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', mutualIds)
+    friends = mutualProfiles || []
+  }
 
   // Check if current user is following this profile
   let isFollowing = false
   if (currentUser && !isOwnProfile) {
-    const { data: followRel } = await supabase
-      .from('follows')
-      .select('*')
-      .match({ follower_id: currentUser.id, following_id: profile.id })
-      .single()
-    
-    if (followRel) isFollowing = true
+    // If the current user is in the followerIds list we just fetched, they are following
+    isFollowing = followerIds.includes(currentUser.id)
   }
 
   // Fetch user's posts
-  const { data: posts } = await supabase
+  let posts = []
+  const { data: rawPosts, error: postsError } = await supabase
     .from('posts')
-    .select('*, profiles(username, avatar_url, display_name), likes(user_id), comments(*, profiles(username, avatar_url))')
+    .select('*, profiles!posts_user_id_fkey(*), likes(user_id), comments(*, profiles(*))')
     .eq('user_id', profile.id)
     .order('created_at', { ascending: false })
+
+  if (postsError) {
+    console.error('[Profile] Posts query error:', postsError)
+    // Fallback if relation fails
+    const { data: fallbackPosts } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('user_id', profile.id)
+      .order('created_at', { ascending: false })
+    
+    if (fallbackPosts) {
+      // Fetch comments for these posts
+      const postIds = fallbackPosts.map(p => p.id)
+      const { data: rawComments } = await supabase
+        .from('comments')
+        .select('*')
+        .in('post_id', postIds)
+      
+      const commentsByPost = {}
+      if (rawComments) {
+        const commentProfileIds = [...new Set(rawComments.map(c => c.user_id))]
+        const { data: commentProfiles } = await supabase.from('profiles').select('*').in('id', commentProfileIds)
+        const commentProfileMap = Object.fromEntries((commentProfiles || []).map(p => [p.id, p]))
+        
+        rawComments.forEach(comment => {
+          if (!commentsByPost[comment.post_id]) commentsByPost[comment.post_id] = []
+          commentsByPost[comment.post_id].push({
+            ...comment,
+            profiles: commentProfileMap[comment.user_id] || null
+          })
+        })
+      }
+
+      posts = fallbackPosts.map(p => ({
+        ...p,
+        profiles: profile, // We already have this user's profile
+        likes: [],
+        comments: commentsByPost[p.id] || []
+      }))
+    }
+  } else {
+    posts = rawPosts || []
+  }
 
   const displayJoinedDate = new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
   const displayName = (profile.first_name && profile.last_name) 
@@ -126,7 +182,9 @@ export default async function ProfilePage({ params }) {
                   <EditProfileModal profile={profile} />
                 </div>
               ) : (
-                <button className={styles.primaryBtn}>{isFollowing ? 'Following' : 'Follow'}</button>
+                <div style={{ marginTop: '-16px' }}>
+                  <FollowButton targetUserId={profile.id} currentUserId={currentUser?.id} initialIsFollowing={isFollowing} />
+                </div>
               )}
             </div>
           </div>
@@ -177,7 +235,7 @@ export default async function ProfilePage({ params }) {
         </div>
 
         {/* Tabs & Content */}
-        <ProfileTabs profile={profile} posts={posts} currentUser={currentUser} />
+        <ProfileTabs profile={profile} posts={posts} currentUser={currentUser} friends={friends} isOwnProfile={isOwnProfile} />
 
       </main>
 

@@ -21,24 +21,28 @@ export default function FollowButton({ targetUserId, currentUserId, initialIsFol
     setIsFollowing(!isFollowing)
 
     if (isFollowing) {
-      // Unfollow
       const { error } = await supabase
         .from('follows')
         .delete()
         .match({ follower_id: currentUserId, following_id: targetUserId })
-      if (!error) toast.success('Unfollowed successfully')
-      else toast.error('Failed to unfollow')
+      if (error) {
+        console.error('[FollowButton] Unfollow failed:', error)
+        setIsFollowing(true) // revert
+        toast.error('Could not unfollow. Please try again.')
+      }
     } else {
-      // Follow
       const { error } = await supabase
         .from('follows')
         .insert({ follower_id: currentUserId, following_id: targetUserId })
-      if (!error) toast.success('Followed successfully')
-      else toast.error('Failed to follow')
+      if (error) {
+        console.error('[FollowButton] Follow failed:', error)
+        setIsFollowing(false) // revert
+        toast.error('Could not follow. Please try again.')
+      }
     }
 
     setLoading(false)
-    router.refresh() // Refresh to update counts on the server component
+    router.refresh()
   }
 
   return (

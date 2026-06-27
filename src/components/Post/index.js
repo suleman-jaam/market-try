@@ -29,23 +29,29 @@ export default function Post({ post, currentUserId }) {
     (a, b) => new Date(a.created_at) - new Date(b.created_at)
   )
 
-  const username = post.profiles?.username || 'unknown'
-  const displayName = post.profiles?.display_name || username
-  const initial = (displayName).charAt(0).toUpperCase()
+  const username = post.profiles?.username || post.user_id?.substring(0, 8) || 'User'
+  const displayName =
+    post.profiles?.display_name ||
+    (post.profiles?.first_name
+      ? `${post.profiles.first_name}${post.profiles.last_name ? ' ' + post.profiles.last_name : ''}`
+      : null) ||
+    username
+  const initial = displayName.charAt(0).toUpperCase()
+
 
   const handleDelete = () => {
     toast((t) => (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <p style={{ margin: 0, fontWeight: 500, color: 'var(--on-surface)' }}>Are you sure you want to delete this post?</p>
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          <button 
+          <button
             className="btn-secondary"
             style={{ width: 'auto', padding: '6px 16px', minHeight: '32px' }}
             onClick={() => toast.dismiss(t.id)}
           >
             Cancel
           </button>
-          <button 
+          <button
             className="btn-primary"
             style={{ width: 'auto', padding: '6px 16px', minHeight: '32px', background: '#DC2626' }}
             onClick={async () => {
@@ -57,7 +63,8 @@ export default function Post({ post, currentUserId }) {
                 toast.success('Post deleted')
                 router.refresh()
               } else {
-                toast.error('Failed to delete post')
+                console.error('[Post] Delete failed:', error)
+                toast.error('Could not delete post. Please try again.')
                 setIsDeleting(false)
               }
             }}
@@ -70,15 +77,31 @@ export default function Post({ post, currentUserId }) {
   }
 
   const handleLike = async () => {
+    if (!currentUserId) {
+      toast('Please log in to like this post', { icon: '🔒' })
+      return
+    }
     const supabase = createClient()
     if (liked) {
       setLiked(false)
       setLikeCount(c => c - 1)
-      await supabase.from('likes').delete().match({ user_id: currentUserId, post_id: post.id })
+      const { error } = await supabase.from('likes').delete().match({ user_id: currentUserId, post_id: post.id })
+      if (error) {
+        console.error('[Post] Unlike failed:', error)
+        // Revert optimistic update
+        setLiked(true)
+        setLikeCount(c => c + 1)
+      }
     } else {
       setLiked(true)
       setLikeCount(c => c + 1)
-      await supabase.from('likes').insert({ user_id: currentUserId, post_id: post.id })
+      const { error } = await supabase.from('likes').insert({ user_id: currentUserId, post_id: post.id })
+      if (error) {
+        console.error('[Post] Like failed:', error)
+        // Revert optimistic update
+        setLiked(false)
+        setLikeCount(c => c - 1)
+      }
     }
   }
 
@@ -92,12 +115,13 @@ export default function Post({ post, currentUserId }) {
       post_id: post.id,
       content: commentContent.trim()
     })
-    if (!error) { 
+    if (!error) {
       setCommentContent('')
       toast.success('Comment posted')
-      router.refresh() 
+      router.refresh()
     } else {
-      toast.error('Failed to post comment')
+      console.error('[Post] Comment failed:', error)
+      toast.error('Could not post comment. Please try again.')
     }
     setIsSubmittingComment(false)
   }
@@ -108,10 +132,10 @@ export default function Post({ post, currentUserId }) {
     return parts.map((part, i) => {
       if (part.startsWith('#')) {
         return (
-          <Link 
-            key={i} 
-            href={`/feed?tag=${encodeURIComponent(part.substring(1).toLowerCase())}`} 
-            style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}
+          <Link
+            key={i}
+            href={`/feed?tag=${encodeURIComponent(part.substring(1).toLowerCase())}`}
+            className={styles.inlineTag}
           >
             {part}
           </Link>
@@ -120,6 +144,7 @@ export default function Post({ post, currentUserId }) {
       return <span key={i}>{part}</span>
     })
   }
+
 
   return (
     <article className={styles.post}>
@@ -144,7 +169,7 @@ export default function Post({ post, currentUserId }) {
             </Link>
             <span className={styles.handle}>@{username}</span>
             <span className={styles.dot}>·</span>
-            <span className={styles.time}>{timeAgo(post.created_at)}</span>
+            <Link href={`/post/${post.id}`} className={styles.time}>{timeAgo(post.created_at)}</Link>
           </div>
           <div className={styles.postActions}>
             {isOwner && (
@@ -209,7 +234,10 @@ export default function Post({ post, currentUserId }) {
           </button>
 
           {/* Share */}
-          <button className={styles.engageBtn} onClick={() => toast.success('Link copied to clipboard!')}>
+          <button className={styles.engageBtn} onClick={() => {
+            navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`)
+            toast.success('Link copied to clipboard!')
+          }}>
             <span className={`${styles.engageIcon} ${styles.shareIcon}`}>
               <span className="material-symbols-outlined sz-18">share</span>
             </span>
@@ -249,8 +277,9 @@ export default function Post({ post, currentUserId }) {
                   type="submit"
                   className={styles.commentSubmit}
                   disabled={isSubmittingComment || !commentContent.trim()}
+                  title="Reply"
                 >
-                  Reply
+                  <span className="material-symbols-outlined sz-18">send</span>
                 </button>
               </form>
             ) : (

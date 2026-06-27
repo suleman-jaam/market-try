@@ -3,7 +3,11 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import Post from '@/components/Post'
 import Sidebar from '@/components/Sidebar'
+import RightPanel from '@/components/RightPanel'
+import SearchBar from '@/components/SearchBar'
 import styles from './search.module.css'
+
+export const dynamic = 'force-dynamic'
 
 
 
@@ -29,67 +33,86 @@ export default async function SearchPage({ searchParams }) {
     profile = newProfile
   }
 
+  // Pre-fetch following list if needed for "Friends Only" filter
+  let followedIds = []
+  if (filter === 'friends') {
+    const { data: follows } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', user.id)
+    followedIds = (follows || []).map(f => f.following_id)
+  }
+
+  const startDate = params.startDate || ''
+  const endDate = params.endDate || ''
+
   let users = []
   let posts = []
 
+  // Always build a posts query
+  let postsQuery = supabase
+    .from('posts')
+    .select('*, profiles!posts_user_id_fkey(username, avatar_url, display_name, seller_score), likes(user_id), comments(*, profiles(username, avatar_url))')
+
   if (query) {
     // Search users by username
-    const { data: usersData } = await supabase
+    let usersQuery = supabase
       .from('profiles')
       .select('*')
       .ilike('username', `%${query}%`)
       .limit(10)
 
+    if (filter === 'verified') {
+      usersQuery = usersQuery.gte('seller_score', 100)
+    } else if (filter === 'friends') {
+      if (followedIds.length === 0) usersQuery = usersQuery.in('id', [user.id])
+      else usersQuery = usersQuery.in('id', followedIds)
+    }
+
+    const { data: usersData } = await usersQuery
     users = usersData || []
 
-    // Search posts by content
-    const { data: postsData } = await supabase
-      .from('posts')
-      .select('*, profiles(username, avatar_url), likes(user_id), comments(*, profiles(username, avatar_url))')
-      .ilike('content', `%${query}%`)
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    posts = postsData || []
-  } else {
-    // Show recent posts as "Explore" when there's no query
-    let queryBuilder = supabase
-      .from('posts')
-      .select('*, profiles(username, avatar_url, display_name, seller_score), likes(user_id), comments(*, profiles(username, avatar_url))')
-
-    if (filter === 'verified') {
-      // For verified filter, we could join profiles or we can filter in JS, but let's assume verified means seller_score > 0 for now.
-      // Wait, we don't have a verified column on posts. Let's just do an order change or simple filter.
-      // Actually, filtering by date is just ascending/descending.
-      // Let's keep it simple and handle the 'date' filter by sorting differently.
+    // Find tags matching query
+    const { data: matchedTags } = await supabase.from('tags').select('id').ilike('name', `%${query}%`)
+    let postIdsFromTags = []
+    if (matchedTags?.length > 0) {
+      const { data: postTags } = await supabase.from('post_tags').select('post_id').in('tag_id', matchedTags.map(t => t.id))
+      postIdsFromTags = (postTags || []).map(pt => pt.post_id)
     }
 
-    if (filter === 'date') {
-      queryBuilder = queryBuilder.order('created_at', { ascending: true }) // oldest first? or just rely on default descending
+    // Apply content or tag ID search
+    if (postIdsFromTags.length > 0) {
+      postsQuery = postsQuery.or(`content.ilike.%${query}%,id.in.(${postIdsFromTags.join(',')})`)
     } else {
-      queryBuilder = queryBuilder.order('created_at', { ascending: false })
-    }
-
-    const { data: explorePosts } = await queryBuilder.limit(20)
-    posts = explorePosts || []
-
-    if (filter === 'verified') {
-      posts = posts.filter(p => p.profiles?.seller_score >= 100)
+      postsQuery = postsQuery.ilike('content', `%${query}%`)
     }
   }
 
-  // Fetch dynamic trending tags
-  const { data: tagsData } = await supabase.from('tags').select('name, post_tags(id)')
-  let trendingTags = (tagsData || [])
-    .map(t => ({ tag: t.name, count: t.post_tags.length }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
-  if (trendingTags.length === 0) {
-    trendingTags = [
-      { tag: 'amazonfba', count: 0 },
-      { tag: 'shopify', count: 0 },
-      { tag: 'ecommerce', count: 0 }
-    ]
+  // Apply Date Range
+  if (startDate) {
+    postsQuery = postsQuery.gte('created_at', new Date(startDate).toISOString())
+  }
+  if (endDate) {
+    const end = new Date(endDate)
+    end.setUTCHours(23, 59, 59, 999)
+    postsQuery = postsQuery.lte('created_at', end.toISOString())
+  }
+
+  // Apply other filters
+  if (filter === 'date') {
+    postsQuery = postsQuery.order('created_at', { ascending: true })
+  } else {
+    postsQuery = postsQuery.order('created_at', { ascending: false })
+  }
+
+  postsQuery = postsQuery.limit(20)
+  const { data: postsData } = await postsQuery
+  posts = postsData || []
+
+  if (filter === 'verified') {
+    posts = posts.filter(p => p.profiles?.seller_score >= 100)
+  } else if (filter === 'friends') {
+    posts = posts.filter(p => followedIds.includes(p.user_id))
   }
 
   return (
@@ -106,49 +129,12 @@ export default async function SearchPage({ searchParams }) {
             Find winning products, master new platforms, and scale your global commerce business.
           </p>
 
-          {/* Search Bar */}
-          <form action="/search" method="GET" className={styles.searchWrap}>
-            <span className={`material-symbols-outlined sz-20 ${styles.searchIcon}`}>search</span>
-            <input
-              type="text"
-              name="q"
-              defaultValue={query}
-              placeholder="Search platforms, products, or strategies..."
-              className={styles.searchInput}
-            />
-          </form>
-
-          {/* Filters */}
-          <div className={styles.filters}>
-            <span className={styles.filterLabel}>Filters:</span>
-            <Link
-              href={`/search?q=${encodeURIComponent(query)}&filter=friends`}
-              className={`${styles.filterChip} ${filter === 'friends' ? '' : styles.filterChipOutline}`}
-            >
-              <span className="material-symbols-outlined sz-16">group</span>
-              Friends Only
-            </Link>
-            <Link
-              href={`/search?q=${encodeURIComponent(query)}&filter=verified`}
-              className={`${styles.filterChip} ${filter === 'verified' ? '' : styles.filterChipOutline}`}
-            >
-              <span className="material-symbols-outlined sz-16">verified</span>
-              Verified Users
-            </Link>
-            <Link
-              href={`/search?q=${encodeURIComponent(query)}&filter=date`}
-              className={`${styles.filterChip} ${filter === 'date' ? '' : styles.filterChipOutline}`}
-            >
-              <span className="material-symbols-outlined sz-16">schedule</span>
-              Date
-            </Link>
-            <Link
-              href={`/search?q=${encodeURIComponent(query)}&filter=tags`}
-              className={`${styles.filterChip} ${filter === 'tags' ? '' : styles.filterChipOutline}`}
-            >
-              Tags
-            </Link>
-          </div>
+          <SearchBar
+            initialQuery={query}
+            initialFilter={filter}
+            initialStartDate={startDate}
+            initialEndDate={endDate}
+          />
         </header>
 
         {/* Search Results - Users */}
@@ -194,36 +180,7 @@ export default async function SearchPage({ searchParams }) {
       </main>
 
       {/* Right Sidebar */}
-      <aside className={styles.rightPanel}>
-        {/* Trending Topics Widget */}
-        <div className={styles.widget}>
-          <div className={styles.widgetHeader}>
-            <h2 className={styles.widgetTitle}>Trending Topics</h2>
-          </div>
-          <div className={styles.widgetBody}>
-            <div className={styles.tagsWrap}>
-              {trendingTags.map((t, i) => (
-                <Link
-                  key={i}
-                  href={`/feed?tag=${encodeURIComponent(t.tag)}`}
-                  className={styles.tagPill}
-                >
-                  {t.tag} <span style={{opacity: 0.6, fontSize: '0.8em', marginLeft: 4}}>{t.count} posts</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className={styles.footerLinks}>
-          <a href="#">Privacy Policy</a>
-          <a href="#">Terms of Service</a>
-          <a href="#">Seller Guidelines</a>
-          <a href="#">Help Center</a>
-          <span>© 2026 Naba Sooq</span>
-        </div>
-      </aside>
+      <RightPanel />
     </div>
   )
 }

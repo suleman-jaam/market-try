@@ -84,8 +84,8 @@ export default function EditProfileModal({ profile }) {
       }
     } catch (uploadError) {
       setLoading(false)
-      toast.error('Image upload failed. Is the "profile_images" bucket public in Supabase?')
-      console.error(uploadError)
+      console.error('[EditProfile] Image upload failed:', uploadError)
+      toast.error('Image upload failed. Please check your file and try again.')
       return
     }
 
@@ -106,10 +106,11 @@ export default function EditProfileModal({ profile }) {
     setLoading(false)
 
     if (error) {
+      console.error('[EditProfile] Update failed:', error)
       if (error.code === '23505') {
-        toast.error('Username is already taken.')
+        toast.error('That username is already taken. Try a different one.')
       } else {
-        toast.error('Failed to update profile: ' + error.message)
+        toast.error('Could not save changes. Please try again.')
       }
       return
     }
